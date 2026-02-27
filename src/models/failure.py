@@ -1,3 +1,4 @@
+# src/models/failure.py
 from datetime import datetime as dt_type
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship

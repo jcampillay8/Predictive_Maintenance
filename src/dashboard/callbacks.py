@@ -1,3 +1,4 @@
+# src/dashboard/callbacks.py
 from dash import Output, Input
 import plotly.graph_objects as go
 import polars as pl
@@ -5,81 +6,107 @@ from sqlalchemy import select
 from src.database.session import SessionLocal
 from src.models.machine import Machine
 from src.models.telemetry import Telemetry
-from src.dashboard.layout import layout
+from src.models.error import Error
+from src.models.failure import Failure
 
 def register_callbacks(app):
     
-    # --- Callback 1: Poblar el Dropdown al cargar la página ---
+    # --- Callback 1: Poblar el Dropdown al iniciar ---
     @app.callback(
         Output('machine-selector', 'options'),
-        Input('machine-selector', 'id') # Trigger al cargar
+        Input('machine-selector', 'id')
     )
     def populate_dropdown(_):
         with SessionLocal() as db:
-            # Traemos solo ID y Modelo para no sobrecargar
+            # Traemos las máquinas para llenar el selector
             machines = db.execute(select(Machine.machineID, Machine.model)).all()
             return [
                 {'label': f"Máquina {m.machineID} (Mod: {m.model})", 'value': m.machineID} 
                 for m in machines
             ]
 
-    # --- Callback 2: Actualizar Gráfico según Máquina Seleccionada ---
+    # --- Callback 2: Actualizar Dashboard Completo ---
     @app.callback(
-        Output('telemetry-graph', 'figure'),
+        [Output('telemetry-graph', 'figure'),
+         Output('error-table', 'data'),
+         Output('machine-stats', 'children')], # Actualizamos también la info de la máquina
         Input('machine-selector', 'value')
     )
-    def update_graph(selected_machine):
+    def update_dashboard(selected_machine):
         if not selected_machine:
-            return {
-                'data': [],
-                'layout': {'title': 'Seleccione una máquina para comenzar'}
-            }
+            return go.Figure(), [], "Seleccione una máquina para ver detalles."
 
         with SessionLocal() as db:
-            # Consultamos las últimas 100 mediciones de telemetría
-            # Nota: Ajustamos el límite para que el gráfico sea fluido
-            query = (
+            # 0. Info de la Máquina (Modelo y Edad)
+            m_info = db.execute(select(Machine).filter(Machine.machineID == selected_machine)).scalar_one_or_none()
+            stats_text = f"Modelo: {m_info.model} | Edad: {m_info.age} años" if m_info else ""
+
+            # 1. CONSULTA DE TELEMETRÍA (Últimos 200 registros)
+            tel_query = (
                 select(Telemetry)
                 .filter(Telemetry.machineID == selected_machine)
                 .order_by(Telemetry.datetime.desc())
                 .limit(200)
             )
+            tel_results = db.execute(tel_query).scalars().all()
             
-            # Convertimos el resultado de SQLAlchemy a un DataFrame de Polars
-            results = db.execute(query).scalars().all()
+            if tel_results:
+                df_tel = pl.DataFrame([
+                    {
+                        "datetime": r.datetime,
+                        "volt": r.volt,
+                        "rotate": r.rotate,
+                        "pressure": r.pressure,
+                        "vibration": r.vibration
+                    } for r in tel_results
+                ]).sort("datetime")
+
+                fig = go.Figure()
+                for var in ['volt', 'rotate', 'pressure', 'vibration']:
+                    fig.add_trace(go.Scatter(
+                        x=df_tel["datetime"], 
+                        y=df_tel[var],
+                        mode='lines',
+                        name=var.capitalize()
+                    ))
+                
+                fig.update_layout(
+                    title=f"Telemetría en Tiempo Real - Máquina {selected_machine}",
+                    xaxis_title="Tiempo",
+                    yaxis_title="Valor",
+                    template="plotly_white",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                )
+            else:
+                fig = go.Figure().update_layout(title="Sin datos disponibles")
+
+            # 2. CONSULTA DE ERRORES Y FALLAS
+            err_query = select(Error).filter(Error.machineID == selected_machine).order_by(Error.datetime.desc()).limit(10)
+            fail_query = select(Failure).filter(Failure.machineID == selected_machine).order_by(Failure.datetime.desc()).limit(10)
             
-            if not results:
-                return {'data': [], 'layout': {'title': 'No hay datos disponibles'}}
+            err_results = db.execute(err_query).scalars().all()
+            fail_results = db.execute(fail_query).scalars().all()
 
-            # Creamos el DF de Polars para manipulación rápida
-            df = pl.DataFrame([
-                {
-                    "datetime": r.datetime,
-                    "volt": r.volt,
-                    "rotate": r.rotate,
-                    "pressure": r.pressure,
-                    "vibration": r.vibration
-                } for r in results
-            ]).sort("datetime")
-
-            # Creamos el gráfico con múltiples ejes o líneas
-            fig = go.Figure()
+            table_data = []
             
-            variables = ['volt', 'rotate', 'pressure', 'vibration']
-            for var in variables:
-                fig.add_trace(go.Scatter(
-                    x=df["datetime"], 
-                    y=df[var],
-                    mode='lines',
-                    name=var.capitalize()
-                ))
+            # Errores (Usando getattr para evitar AttributeErrors)
+            for e in err_results:
+                eid = getattr(e, 'errorID', getattr(e, 'id', 'N/A'))
+                table_data.append({
+                    "datetime": e.datetime.strftime("%Y-%m-%d %H:%M"),
+                    "type": "⚠️ ERROR",
+                    "errorID": eid
+                })
+            
+            # Fallas (Corregido según tu modelo: usa .id y .failure)
+            for f in fail_results:
+                table_data.append({
+                    "datetime": f.datetime.strftime("%Y-%m-%d %H:%M"),
+                    "type": f"🚨 FALLA ({f.failure})",
+                    "errorID": f.id 
+                })
 
-            fig.update_layout(
-                title=f"Telemetría Real-Time: Máquina {selected_machine}",
-                xaxis_title="Tiempo",
-                yaxis_title="Valor Medido",
-                template="plotly_white",
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-            )
+            # Ordenamos la tabla por fecha
+            table_data = sorted(table_data, key=lambda x: x['datetime'], reverse=True)
 
-            return fig
+            return fig, table_data, stats_text
