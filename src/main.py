@@ -36,27 +36,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ==============================
-# 📊 Dash App Integration
-# ==============================
-# ==============================
-# 1. Creamos Dash de forma independiente (server=True crea un Flask interno)
-# ==============================
-# 📊 Dash App Integration
-# ==============================
+# 1. Configuración de la app de Dash
 dash_app = Dash(
     __name__,
+    # Usar server=True o pasarle el server explícitamente ayuda a la registración de componentes
     server=True, 
-    # Cambiamos url_base_pathname por requests_pathname_prefix
-    requests_pathname_prefix="/dashboard/", 
-    external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
+    requests_pathname_prefix="/dashboard/",
+    serve_locally=True, 
+    external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP],
+    # Esto ayuda a que Dash no se pierda buscando sus componentes
+    suppress_callback_exceptions=True 
 )
 
+# 2. Definir layout y callbacks
 dash_app.title = "Predictive Maintenance Dashboard"
 dash_app.layout = layout
 register_callbacks(dash_app)
 
-# Asegúrate de que este path sea EXACTAMENTE igual al prefijo de arriba
+# 3. Montaje en FastAPI
+# Usamos dash_app.server que es el objeto Flask real
 app.mount("/dashboard", WSGIMiddleware(dash_app.server))
 # ==============================
 # 🧭 FastAPI Routes (API)
