@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:15
+    container_name: maintenance_db
+    environment:
+      POSTGRES_USER: jcampillay
+      POSTGRES_PASSWORD: BTC.100K.jc
+      POSTGRES_DB: maintenance
+    ports:
+      - "5443:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jcampillay -d maintenance"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: maintenance_app
+    ports:
+      - "8050:8080"
+    volumes:
+      - .:/app  # <--- 🚀 ESTO ES CLAVE: Sincroniza tus archivos locales con el contenedor
+    environment:
+      DATABASE_URL: postgresql://jcampillay:BTC.100K.jc@db:5432/maintenance
+      DB_USER: jcampillay
+      DB_PASSWORD: BTC.100K.jc
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: maintenance
+      ENVIRONMENT: development
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
