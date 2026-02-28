@@ -168,3 +168,56 @@ def register_callbacks(app):
         response = analyst.ask_llm(context, user_question)
         
         return response
+
+    @app.callback(
+        Output("ai-output-ops", "children"),
+        Input("ask-ai-btn-ops", "n_clicks"),
+        State("ai-input-ops", "value"),
+        State("machine-selector", "value"),
+        State("error-table", "data"),
+        # Eliminamos el State del gráfico porque es inestable
+        prevent_initial_call=True
+    )
+    def get_operational_ai_insight(n_clicks, user_question, machine_id, table_data):
+        if not n_clicks or not user_question or not machine_id:
+            return "Por favor, seleccione una máquina e ingrese una pregunta."
+
+        analyst = AIAnalyst()
+        
+        # --- NUEVA ESTRATEGIA: Consulta directa a la DB para el contexto ---
+        with SessionLocal() as db:
+            from src.models.telemetry import Telemetry
+            from sqlalchemy import select
+            
+            # Traemos los últimos 10 registros de telemetría para que la IA tenga tendencia
+            tel_query = (
+                select(Telemetry)
+                .filter(Telemetry.machineID == machine_id)
+                .order_by(Telemetry.datetime.desc())
+                .limit(10)
+            )
+            recent_tel = db.execute(tel_query).scalars().all()
+            
+            if recent_tel:
+                telemetry_context = [
+                    {
+                        "fecha": r.datetime.strftime("%H:%M:%S"),
+                        "volt": r.volt,
+                        "rotate": r.rotate,
+                        "pressure": r.pressure,
+                        "vibration": r.vibration
+                    } for r in recent_tel
+                ]
+                telemetry_summary = str(telemetry_context)
+            else:
+                telemetry_summary = "No se encontraron datos de telemetría en la base de datos para esta máquina."
+
+        # Llamada al LLM con datos frescos de la DB
+        response = analyst.ask_llm_operational(
+            machine_id=str(machine_id),
+            telemetry_context=telemetry_summary,
+            events_context=str(table_data[:5]) if table_data else "Sin eventos recientes",
+            question=user_question
+        )
+        
+        return response

@@ -28,15 +28,32 @@ def create_layout():
                             dbc.CardHeader(html.H5("Configuración de Activo", className="mb-0")),
                             dbc.CardBody([
                                 html.Label("Seleccionar Máquina:", className="fw-bold mb-2"),
-                                dcc.Dropdown(
-                                    id='machine-selector',
-                                    placeholder="Busque por ID o Modelo...",
-                                    className="mb-3",
-                                    clearable=False
-                                ),
-                                html.Div(id="machine-stats", className="small text-info p-2 bg-light border rounded")
+                                dcc.Dropdown(id='machine-selector', placeholder="Busque por ID...", className="mb-3", clearable=False),
+                                html.Div(id="machine-stats", className="small text-info p-2 bg-light border rounded mb-3")
                             ])
-                        ], className="shadow-sm mb-4")
+                        ], className="shadow-sm mb-3"),
+
+                        # --- NUEVO: CHAT IA OPERACIONAL ---
+                        dbc.Card([
+                            dbc.CardHeader(html.H5("🤖 Diagnóstico IA", className="text-white bg-dark mb-0")),
+                            dbc.CardBody([
+                                dbc.Textarea(
+                                    id="ai-input-ops",
+                                    placeholder="Ej: ¿La vibración actual explica el último error?",
+                                    style={"height": "100px"},
+                                    className="mb-2"
+                                ),
+                                dbc.Button("Analizar Activo", id="ask-ai-btn-ops", color="dark", size="sm", className="w-100 mb-3"),
+                                dcc.Loading(
+                                    html.Div(
+                                        id="ai-output-ops",
+                                        className="p-2 border rounded bg-white small",
+                                        style={"minHeight": "150px", "whiteSpace": "pre-line", "fontSize": "0.85rem"},
+                                        children="Seleccione una máquina y pregunte sobre su estado actual."
+                                    )
+                                )
+                            ])
+                        ], className="shadow-sm")
                     ], lg=3, md=4, xs=12),
 
                     # Columna Derecha: Gráfico y Tabla Operativa

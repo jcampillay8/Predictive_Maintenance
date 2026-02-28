@@ -31,3 +31,30 @@ class AIAnalyst:
             return response.text
         except Exception as e:
             return f"❌ Error en el análisis de IA: {str(e)}"
+
+    def ask_llm_operational(self, machine_id: str, telemetry_context: str, events_context: str, question: str) -> str:
+        prompt = f"""
+        ROL: Ingeniero de Confiabilidad de Terreno para Komatsu.
+        ACTIVO: Máquina ID {machine_id}
+        
+        CONTEXTO OPERACIONAL (Última Telemetría):
+        {telemetry_context}
+        
+        HISTORIAL RECIENTE (Errores y Fallas):
+        {events_context}
+        
+        TAREA: Analizar los signos vitales de la máquina y responder la consulta técnica.
+        
+        REGLAS:
+        1. Analiza tendencias en Voltaje, Rotación, Presión y Vibración.
+        2. Relaciona los errores recientes con los datos de telemetría.
+        3. Si hay vibración alta, advierte sobre posible falla mecánica.
+        4. Sé directo, técnico y enfocado en la disponibilidad del activo.
+
+        PREGUNTA DEL OPERADOR: {question}
+        """
+        try:
+            response = self.model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            return f"❌ Error en el análisis operativo: {str(e)}"
