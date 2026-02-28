@@ -1,6 +1,7 @@
 # src/analysis/reliability_metrics.py
 import polars as pl
 from sqlalchemy import select
+from src.core.config import settings  # <--- IMPORTANTE: Añade esta línea
 from src.database.session import SessionLocal, engine
 from src.models.failure import Failure
 from src.models.maintenance import Maintenance
@@ -35,33 +36,32 @@ def get_processed_data():
             pl.col("datetime").diff().over("machineID").alias("diff")
         )
 
-        # 4. Agregación de KPIs
-        # MTBF: Promedio de tiempo cuando el evento anterior fue una falla
-        # MTTR: Promedio de tiempo cuando el evento es mantenimiento (tiempo de respuesta)
+        # 4. Agregación de KPIs (MTBF y MTTR)
         metrics = df_combined.group_by("machineID").agg([
-            (pl.col("diff").filter(pl.col("type") == "failure").dt.total_minutes() / 60).mean().alias("MTBF_hours"),
-            (pl.col("diff").filter(pl.col("type") == "maint").dt.total_minutes() / 60).mean().alias("MTTR_hours"),
+            pl.col("diff").filter(pl.col("type") == "failure").dt.total_hours().mean().alias("MTBF_hours"),
+            pl.col("diff").filter(pl.col("type") == "maint").dt.total_hours().mean().alias("MTTR_hours"),
             pl.col("type").filter(pl.col("type") == "failure").count().alias("total_failures")
         ]).fill_null(0)
 
         return metrics
 
 def update_reliability_table():
-    """Calcula las métricas y las guarda en la tabla 'reliability_stats' para Dash y Power BI."""
-    print("🚀 Iniciando procesamiento de KPIs estratégicos...")
+    """Calcula las métricas y las guarda en la tabla 'reliability_stats'."""
+    print("🚀 Iniciando procesamiento de KPIs estratégicos en Neon...")
     
     summary = get_processed_data()
     
     if summary is not None:
-        # Guardamos en SQL (esto crea o reemplaza la tabla físicamente en Postgres)
         try:
+            # Guardamos con el esquema correcto para evitar que se vaya a 'public'
             summary.to_pandas().to_sql(
                 "reliability_stats", 
                 con=engine, 
+                schema=settings.DB_SCHEMA, # Forzamos el esquema 'maintenance'
                 if_exists="replace", 
                 index=False
             )
-            print("✅ Tabla 'reliability_stats' actualizada con éxito.")
+            print("✅ Tabla 'reliability_stats' actualizada con éxito en el esquema:", settings.DB_SCHEMA)
             print(summary.head())
         except Exception as e:
             print(f"❌ Error al guardar en la base de datos: {e}")

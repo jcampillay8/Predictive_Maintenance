@@ -14,6 +14,8 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
+    DATA_PATH: Path = BASE_DIR / "Data"
+
     # El entorno se lee del .env o de Railway. Si no existe, lanza error (o usa dev)
     ENVIRONMENT: str 
     PROJECT_NAME: str
