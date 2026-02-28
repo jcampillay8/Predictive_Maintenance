@@ -23,4 +23,4 @@ COPY . .
 EXPOSE 8080
 
 # Usamos python -m para invocar el módulo directamente
-CMD ["python", "-m", "gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8080", "src.main:app"]
+CMD ["python", "-m", "gunicorn", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8080", "src.main:app"]

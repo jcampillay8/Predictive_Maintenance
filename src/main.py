@@ -28,9 +28,12 @@ app = FastAPI(
 )
 
 # 🧱 Middlewares
+# Convertimos el string de ALLOWED_ORIGINS en una lista real de Python
+origins = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=origins if settings.ENVIRONMENT == "production" else ["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
