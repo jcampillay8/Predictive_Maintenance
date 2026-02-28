@@ -9,215 +9,158 @@ from src.models.telemetry import Telemetry
 from src.models.error import Error
 from src.models.failure import Failure
 from src.services.ai_analyst import AIAnalyst
-import plotly.express as px
 
 def register_callbacks(app):
     
-    # --- Callback 1: Poblar el Dropdown al iniciar ---
+    # --- Callback 1: Poblar el Dropdown ---
     @app.callback(
         Output('machine-selector', 'options'),
         Input('machine-selector', 'id')
     )
     def populate_dropdown(_):
         with SessionLocal() as db:
-            # Traemos las máquinas para llenar el selector
             machines = db.execute(select(Machine.machineID, Machine.model)).all()
             return [
                 {'label': f"Máquina {m.machineID} (Mod: {m.model})", 'value': m.machineID} 
                 for m in machines
             ]
 
-    # --- Callback 2: Actualizar Dashboard Completo ---
+    # --- Callback 2: Actualizar Dashboard Operacional ---
     @app.callback(
         [Output('telemetry-graph', 'figure'),
          Output('error-table', 'data'),
-         Output('machine-stats', 'children')], # Actualizamos también la info de la máquina
-        Input('machine-selector', 'value')
+         Output('machine-stats', 'children')],
+        [Input('machine-selector', 'value')]
     )
     def update_dashboard(selected_machine):
-        if not selected_machine:
-            return go.Figure(), [], "Seleccione una máquina para ver detalles."
+        # 1. FORZAMOS EL VALOR 1 si Dash envía None al inicio
+        machine_to_query = selected_machine if selected_machine is not None else 1
 
         with SessionLocal() as db:
-            # 0. Info de la Máquina (Modelo y Edad)
-            m_info = db.execute(select(Machine).filter(Machine.machineID == selected_machine)).scalar_one_or_none()
-            stats_text = f"Modelo: {m_info.model} | Edad: {m_info.age} años" if m_info else ""
+            # 2. Info de la Máquina (Usando machine_to_query)
+            m_info = db.execute(select(Machine).filter(Machine.machineID == machine_to_query)).scalar_one_or_none()
+            
+            if not m_info:
+                return go.Figure(), [], "Máquina no encontrada en DB."
 
-            # 1. CONSULTA DE TELEMETRÍA (Últimos 200 registros)
+            stats_text = f"Modelo: {m_info.model} | Edad: {m_info.age} años"
+
+            # 3. Telemetría (Usando machine_to_query)
             tel_query = (
                 select(Telemetry)
-                .filter(Telemetry.machineID == selected_machine)
+                .filter(Telemetry.machineID == machine_to_query)
                 .order_by(Telemetry.datetime.desc())
                 .limit(200)
             )
             tel_results = db.execute(tel_query).scalars().all()
             
+            fig = go.Figure()
             if tel_results:
-                df_tel = pl.DataFrame([
-                    {
-                        "datetime": r.datetime,
-                        "volt": r.volt,
-                        "rotate": r.rotate,
-                        "pressure": r.pressure,
-                        "vibration": r.vibration
-                    } for r in tel_results
-                ]).sort("datetime")
+                d_time = [r.datetime for r in tel_results][::-1]
+                d_volt = [r.volt for r in tel_results][::-1]
+                d_rotate = [r.rotate for r in tel_results][::-1]
+                d_pressure = [r.pressure for r in tel_results][::-1]
+                d_vibration = [r.vibration for r in tel_results][::-1]
 
-                fig = go.Figure()
-                for var in ['volt', 'rotate', 'pressure', 'vibration']:
-                    fig.add_trace(go.Scatter(
-                        x=df_tel["datetime"], 
-                        y=df_tel[var],
-                        mode='lines',
-                        name=var.capitalize()
-                    ))
+                for name, data in zip(['Volt', 'Rotate', 'Pressure', 'Vibration'], 
+                                     [d_volt, d_rotate, d_pressure, d_vibration]):
+                    fig.add_trace(go.Scatter(x=d_time, y=data, mode='lines', name=name))
                 
-                fig.update_layout(
-                    title=f"Telemetría en Tiempo Real - Máquina {selected_machine}",
-                    xaxis_title="Tiempo",
-                    yaxis_title="Valor",
-                    template="plotly_white",
+                    fig.update_layout(
+                    # Usamos <b> para negrita y aumentamos un poco el tamaño con span si quisieras
+                    title=dict(
+                        text=f"<b>Telemetría en Tiempo Real - Máquina {machine_to_query}</b>",
+                        font=dict(size=20) # Opcional: para que destaque más
+                    ),
+                    paper_bgcolor='white', 
+                    plot_bgcolor='white',
+                    xaxis=dict(showgrid=True, gridcolor='lightgrey'),
+                    yaxis=dict(showgrid=True, gridcolor='lightgrey'),
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                 )
             else:
-                fig = go.Figure().update_layout(title="Sin datos disponibles")
+                fig.update_layout(title="Sin datos de telemetría")
 
-            # 2. CONSULTA DE ERRORES Y FALLAS
-            err_query = select(Error).filter(Error.machineID == selected_machine).order_by(Error.datetime.desc()).limit(10)
-            fail_query = select(Failure).filter(Failure.machineID == selected_machine).order_by(Failure.datetime.desc()).limit(10)
-            
-            err_results = db.execute(err_query).scalars().all()
-            fail_results = db.execute(fail_query).scalars().all()
+            # 4. Errores y Fallas (¡IMPORTANTE! Cambiado a machine_to_query aquí también)
+            err_res = db.execute(select(Error).filter(Error.machineID == machine_to_query).order_by(Error.datetime.desc()).limit(10)).scalars().all()
+            fail_res = db.execute(select(Failure).filter(Failure.machineID == machine_to_query).order_by(Failure.datetime.desc()).limit(10)).scalars().all()
 
             table_data = []
-            
-            # Errores (Usando getattr para evitar AttributeErrors)
-            for e in err_results:
-                eid = getattr(e, 'errorID', getattr(e, 'id', 'N/A'))
+            for e in err_res:
                 table_data.append({
-                    "datetime": e.datetime.strftime("%Y-%m-%d %H:%M"),
-                    "type": "⚠️ ERROR",
-                    "errorID": eid
+                    "datetime": e.datetime.strftime("%Y-%m-%d %H:%M"), 
+                    "type": "⚠️ ERROR", 
+                    "errorID": getattr(e, 'errorID', 'N/A')
                 })
-            
-            # Fallas (Corregido según tu modelo: usa .id y .failure)
-            for f in fail_results:
+            for f in fail_res:
                 table_data.append({
-                    "datetime": f.datetime.strftime("%Y-%m-%d %H:%M"),
-                    "type": f"🚨 FALLA ({f.failure})",
-                    "errorID": f.id 
+                    "datetime": f.datetime.strftime("%Y-%m-%d %H:%M"), 
+                    "type": f"🚨 FALLA ({f.failure})", 
+                    "errorID": f.id
                 })
 
-            # Ordenamos la tabla por fecha
-            table_data = sorted(table_data, key=lambda x: x['datetime'], reverse=True)
+            return fig, sorted(table_data, key=lambda x: x['datetime'], reverse=True), stats_text
 
-            return fig, table_data, stats_text
-
+    # --- Callback 3: Vista Estratégica ---
     @app.callback(
         [Output('kpi-comparison-graph', 'figure'),
          Output('kpi-table', 'data'),
          Output('kpi-table', 'columns')],
-        Input('machine-selector', 'id') # Se dispara al cargar
+        Input('machine-selector', 'id')
     )
     def update_strategic_view(_):
         with SessionLocal() as db:
-            # Leemos la tabla procesada
-            df = pl.read_database("SELECT * FROM reliability_stats", connection=engine.connect())
+            # Usamos una conexión directa para Polars
+            with engine.connect() as conn:
+                df = pl.read_database("SELECT * FROM reliability_stats", connection=conn)
             
-            # Gráfico de comparación MTBF vs MTTR
-            fig = px.bar(
-                df.to_pandas(), 
-                x="machineID", 
-                y=["MTBF_hours", "MTTR_hours"],
-                barmode="group",
+            fig = go.Figure(data=[
+                go.Bar(name='MTBF (Horas)', x=df['machineID'].to_list(), y=df['MTBF_hours'].to_list()),
+                go.Bar(name='MTTR (Horas)', x=df['machineID'].to_list(), y=df['MTTR_hours'].to_list())
+            ])
+            
+            fig.update_layout(
                 title="Comparativa MTBF vs MTTR por Máquina",
-                labels={"value": "Horas", "variable": "Métrica"}
+                barmode='group', paper_bgcolor='white', plot_bgcolor='white'
             )
             
             columns = [{"name": i, "id": i} for i in df.columns]
             return fig, df.to_dicts(), columns
 
-# --- NUEVO CALLBACK: AGENTE DE IA ESTRATÉGICO ---
+    # --- Callback 4: IA Estratégica ---
     @app.callback(
         Output("ai-output", "children"),
         Input("ask-ai-btn", "n_clicks"),
         State("ai-input", "value"),
-        State("kpi-table", "data"), # Enviamos los datos del Data Mart (KPIs)
+        State("kpi-table", "data"),
         prevent_initial_call=True
     )
     def get_ai_insight(n_clicks, user_question, kpi_data):
         if not n_clicks or not user_question:
             return "Por favor, ingrese una pregunta para el analista."
-
-        # Instanciamos el analista (Gemini 1.5 Pro)
         analyst = AIAnalyst()
-        
-        # Preparamos el contexto. 
-        # Convertimos la lista de diccionarios de la tabla a un formato legible.
-        context = f"""
-        DATOS DEL DATA MART DE CONFIABILIDAD:
-        {str(kpi_data)}
-        
-        NOTAS ADICIONALES:
-        - MTBF_hours: Promedio de horas de operación entre fallas (Métrica de fiabilidad).
-        - MTTR_hours: Promedio de horas requeridas para reparación (Métrica de mantenibilidad).
-        - total_failures: Número total de eventos de falla registrados por máquina.
-        """
-        
-        # Llamada al LLM
-        response = analyst.ask_llm(context, user_question)
-        
-        return response
+        context = f"DATOS DEL DATA MART: {str(kpi_data)}"
+        return analyst.ask_llm(context, user_question)
 
+    # --- Callback 5: IA Operacional ---
     @app.callback(
         Output("ai-output-ops", "children"),
         Input("ask-ai-btn-ops", "n_clicks"),
         State("ai-input-ops", "value"),
         State("machine-selector", "value"),
         State("error-table", "data"),
-        # Eliminamos el State del gráfico porque es inestable
         prevent_initial_call=True
     )
     def get_operational_ai_insight(n_clicks, user_question, machine_id, table_data):
-        if not n_clicks or not user_question or not machine_id:
-            return "Por favor, seleccione una máquina e ingrese una pregunta."
+        # Aquí también protegemos el machine_id
+        m_id = machine_id if machine_id is not None else 1
+        
+        if not n_clicks or not user_question:
+            return "Por favor, ingrese una pregunta."
 
         analyst = AIAnalyst()
-        
-        # --- NUEVA ESTRATEGIA: Consulta directa a la DB para el contexto ---
         with SessionLocal() as db:
-            from src.models.telemetry import Telemetry
-            from sqlalchemy import select
-            
-            # Traemos los últimos 10 registros de telemetría para que la IA tenga tendencia
-            tel_query = (
-                select(Telemetry)
-                .filter(Telemetry.machineID == machine_id)
-                .order_by(Telemetry.datetime.desc())
-                .limit(10)
-            )
-            recent_tel = db.execute(tel_query).scalars().all()
-            
-            if recent_tel:
-                telemetry_context = [
-                    {
-                        "fecha": r.datetime.strftime("%H:%M:%S"),
-                        "volt": r.volt,
-                        "rotate": r.rotate,
-                        "pressure": r.pressure,
-                        "vibration": r.vibration
-                    } for r in recent_tel
-                ]
-                telemetry_summary = str(telemetry_context)
-            else:
-                telemetry_summary = "No se encontraron datos de telemetría en la base de datos para esta máquina."
+            tel = db.execute(select(Telemetry).filter(Telemetry.machineID == m_id).order_by(Telemetry.datetime.desc()).limit(10)).scalars().all()
+            telemetry_summary = str([{"volt": r.volt, "rotate": r.rotate} for r in tel])
 
-        # Llamada al LLM con datos frescos de la DB
-        response = analyst.ask_llm_operational(
-            machine_id=str(machine_id),
-            telemetry_context=telemetry_summary,
-            events_context=str(table_data[:5]) if table_data else "Sin eventos recientes",
-            question=user_question
-        )
-        
-        return response
+        return analyst.ask_llm_operational(str(m_id), telemetry_summary, str(table_data[:5]), user_question)

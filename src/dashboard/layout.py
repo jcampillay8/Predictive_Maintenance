@@ -4,14 +4,29 @@ import dash_bootstrap_components as dbc
 
 def create_layout():
     return dbc.Container([
-        # 1. Encabezado estilizado
+# 1. Encabezado de Alto Impacto con Autoría Destacada
         dbc.Row([
             dbc.Col(
                 html.Div([
-                    html.H1("📊 Dashboard de Mantenimiento Predictivo", className="display-4 text-primary"),
-                    html.P("Gestión de Activos: Desde Monitoreo en Tiempo Real hasta Estrategia de Negocio.", className="lead text-muted"),
-                    html.Hr(className="my-2"),
-                ], className="py-4 text-center"),
+                    html.H1("📊 Dashboard de Mantenimiento Predictivo", 
+                            className="display-4 text-primary fw-bold mb-2"),
+                    html.P("Gestión de Activos: Desde Monitoreo en Tiempo Real hasta Estrategia de Negocio.", 
+                           className="lead text-muted mb-4"),
+                    # --- BLOQUE DE AUTORÍA DESTACADO ---
+                    html.Div([
+                        html.P("DISEÑADO Y DESARROLLADO POR", 
+                               className="text-secondary mb-1", 
+                               style={"fontSize": "0.8rem", "letterSpacing": "3px", "fontWeight": "600"}),
+                        html.H2("JAIME CAMPILLAY ROJAS", 
+                                className="text-dark mb-0", 
+                                style={"fontWeight": "800", "letterSpacing": "1px"}),
+                        html.Div(className="bg-primary mx-auto my-2", 
+                                 style={"height": "4px", "width": "60px", "borderRadius": "2px"}),
+                        html.P("INGENIERO CIVIL INDUSTRIAL | SENIOR SOFTWARE & DATA ENGINEER", 
+                               className="text-primary fw-bold small uppercase"),
+                    ], className="py-3 bg-white shadow-sm rounded-3 border mb-4", style={"maxWidth": "1200px", "margin": "0 auto"}),                    
+                    html.Hr(className="my-4"),
+                ], className="pt-5 pb-4 text-center"),
                 width=12
             )
         ]),
@@ -28,7 +43,7 @@ def create_layout():
                             dbc.CardHeader(html.H5("Configuración de Activo", className="mb-0")),
                             dbc.CardBody([
                                 html.Label("Seleccionar Máquina:", className="fw-bold mb-2"),
-                                dcc.Dropdown(id='machine-selector', placeholder="Busque por ID...", className="mb-3", clearable=False),
+                                dcc.Dropdown(id='machine-selector', placeholder="Busque por ID...", className="mb-3", clearable=False, value=1, persistence=True),
                                 html.Div(id="machine-stats", className="small text-info p-2 bg-light border rounded mb-3")
                             ])
                         ], className="shadow-sm mb-3"),
@@ -132,9 +147,9 @@ def create_layout():
                     # Columna del Agente de IA (Gemini 1.5 Pro)
                     dbc.Col([
                         dbc.Card([
-                            dbc.CardHeader(html.H5("🤖 Analista Virtual Komatsu", className="text-white bg-primary mb-0")),
+                            dbc.CardHeader(html.H5("🤖 Analista Virtual", className="text-white bg-primary mb-0")),
                             dbc.CardBody([
-                                html.P("Optimización basada en modelos generativos (Gemini 1.5 Pro).", className="small text-muted fw-bold"),
+                                html.P("Optimización basada en modelos generativos (gemini-2.0-flash).", className="small text-muted fw-bold"),
                                 html.Label("Pregunte al analista sobre la flota:", className="small"),
                                 dbc.Textarea(
                                     id="ai-input",
