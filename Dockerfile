@@ -15,8 +15,8 @@ RUN apt-get update && apt-get install -y \
 # Copiamos archivos de dependencias
 COPY requirements.txt .
 # Forzamos la instalación de gunicorn y uvicorn explícitamente por seguridad
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir gunicorn uvicorn
+RUN pip install --no-cache-dir --default-timeout=100 --retries 5 -r requirements.txt && \
+    pip install --no-cache-dir --default-timeout=100 --retries 5 gunicorn uvicorn
 
 COPY . .
 

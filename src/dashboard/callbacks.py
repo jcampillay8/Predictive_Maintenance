@@ -3,11 +3,12 @@ from dash import Output, Input
 import plotly.graph_objects as go
 import polars as pl
 from sqlalchemy import select
-from src.database.session import SessionLocal
+from src.database.session import SessionLocal, engine
 from src.models.machine import Machine
 from src.models.telemetry import Telemetry
 from src.models.error import Error
 from src.models.failure import Failure
+import plotly.express as px
 
 def register_callbacks(app):
     
@@ -110,3 +111,27 @@ def register_callbacks(app):
             table_data = sorted(table_data, key=lambda x: x['datetime'], reverse=True)
 
             return fig, table_data, stats_text
+
+    @app.callback(
+        [Output('kpi-comparison-graph', 'figure'),
+         Output('kpi-table', 'data'),
+         Output('kpi-table', 'columns')],
+        Input('machine-selector', 'id') # Se dispara al cargar
+    )
+    def update_strategic_view(_):
+        with SessionLocal() as db:
+            # Leemos la tabla procesada
+            df = pl.read_database("SELECT * FROM reliability_stats", connection=engine.connect())
+            
+            # Gráfico de comparación MTBF vs MTTR
+            fig = px.bar(
+                df.to_pandas(), 
+                x="machineID", 
+                y=["MTBF_hours", "MTTR_hours"],
+                barmode="group",
+                title="Comparativa MTBF vs MTTR por Máquina",
+                labels={"value": "Horas", "variable": "Métrica"}
+            )
+            
+            columns = [{"name": i, "id": i} for i in df.columns]
+            return fig, df.to_dicts(), columns

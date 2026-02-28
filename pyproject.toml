@@ -5,6 +5,7 @@ description = "Dashboard de Mantenimiento Predictivo para activos industriales"
 authors = [{name = "Jaime Campillay"}]
 dependencies = [
     "polars>=1.0.0",
+    "pyarrow",                
     "pandas",
     "sqlalchemy",
     "psycopg2-binary",
@@ -16,6 +17,7 @@ dependencies = [
     "pydantic-settings",
     "fastapi>=0.133.1",
     "uvicorn>=0.41.0",
+    "adbc-driver-postgresql",
 ]
 
 [build-system]
