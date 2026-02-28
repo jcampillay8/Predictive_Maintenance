@@ -9,7 +9,7 @@ class AIAnalyst:
 
     def ask_llm(self, data_context: str, question: str) -> str:
         prompt = f"""
-        ROL: Eres el Consultor Senior de Confiabilidad para Komatsu Chile.
+        ROL: Eres el Consultor Senior de Confiabilidad para una empersa importante en Chile.
         CONTEXTO: Analizando el Data Mart de KPIs de la flota.
         
         DATOS (JSON):
@@ -34,7 +34,7 @@ class AIAnalyst:
 
     def ask_llm_operational(self, machine_id: str, telemetry_context: str, events_context: str, question: str) -> str:
         prompt = f"""
-        ROL: Ingeniero de Confiabilidad de Terreno para Komatsu.
+        ROL: Ingeniero de Confiabilidad de Terreno para una empresa importante en Chile.
         ACTIVO: Máquina ID {machine_id}
         
         CONTEXTO OPERACIONAL (Última Telemetría):
