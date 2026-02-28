@@ -1,3 +1,4 @@
+# src/core/config.py
 import os
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -26,6 +27,8 @@ class Settings(BaseSettings):
     DB_PORT: int
     DB_NAME: str
     DB_SCHEMA: str = "maintenance"
+
+    GEMINI_API_KEY: str
 
     @property
     def DATABASE_URL(self) -> str:

@@ -1,3 +1,4 @@
+# src/database/base.py
 from datetime import datetime
 from sqlalchemy import DateTime, func, MetaData
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column

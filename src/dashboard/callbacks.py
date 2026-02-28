@@ -1,5 +1,5 @@
 # src/dashboard/callbacks.py
-from dash import Output, Input
+from dash import Output, Input, State
 import plotly.graph_objects as go
 import polars as pl
 from sqlalchemy import select
@@ -8,6 +8,7 @@ from src.models.machine import Machine
 from src.models.telemetry import Telemetry
 from src.models.error import Error
 from src.models.failure import Failure
+from src.services.ai_analyst import AIAnalyst
 import plotly.express as px
 
 def register_callbacks(app):
@@ -135,3 +136,35 @@ def register_callbacks(app):
             
             columns = [{"name": i, "id": i} for i in df.columns]
             return fig, df.to_dicts(), columns
+
+# --- NUEVO CALLBACK: AGENTE DE IA ESTRATÉGICO ---
+    @app.callback(
+        Output("ai-output", "children"),
+        Input("ask-ai-btn", "n_clicks"),
+        State("ai-input", "value"),
+        State("kpi-table", "data"), # Enviamos los datos del Data Mart (KPIs)
+        prevent_initial_call=True
+    )
+    def get_ai_insight(n_clicks, user_question, kpi_data):
+        if not n_clicks or not user_question:
+            return "Por favor, ingrese una pregunta para el analista."
+
+        # Instanciamos el analista (Gemini 1.5 Pro)
+        analyst = AIAnalyst()
+        
+        # Preparamos el contexto. 
+        # Convertimos la lista de diccionarios de la tabla a un formato legible.
+        context = f"""
+        DATOS DEL DATA MART DE CONFIABILIDAD:
+        {str(kpi_data)}
+        
+        NOTAS ADICIONALES:
+        - MTBF_hours: Promedio de horas de operación entre fallas (Métrica de fiabilidad).
+        - MTTR_hours: Promedio de horas requeridas para reparación (Métrica de mantenibilidad).
+        - total_failures: Número total de eventos de falla registrados por máquina.
+        """
+        
+        # Llamada al LLM
+        response = analyst.ask_llm(context, user_question)
+        
+        return response

@@ -30,41 +30,49 @@ app = FastAPI(
 # 🧱 Middlewares
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Ajustar según settings.ALLOWED_ORIGINS más adelante
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# 1. Configuración de la app de Dash
+# ==============================
+# 📊 Dash App Configuration
+# ==============================
+# 1. Inicializamos Dash sin pasarle server=True.
+# Dejamos que Dash cree su Flask interno para luego montarlo.
 dash_app = Dash(
     __name__,
-    # Usar server=True o pasarle el server explícitamente ayuda a la registración de componentes
-    server=True, 
     requests_pathname_prefix="/dashboard/",
     serve_locally=True, 
     external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP],
-    # Esto ayuda a que Dash no se pierda buscando sus componentes
     suppress_callback_exceptions=True 
 )
 
 # 2. Definir layout y callbacks
-dash_app.title = "Predictive Maintenance Dashboard"
+dash_app.title = "Komatsu | Predictive Maintenance"
 dash_app.layout = layout
+
+# IMPORTANTE: Registrar los callbacks antes de montar la app
 register_callbacks(dash_app)
 
 # 3. Montaje en FastAPI
-# Usamos dash_app.server que es el objeto Flask real
+# Usamos dash_app.server, que es la instancia de Flask creada por Dash
 app.mount("/dashboard", WSGIMiddleware(dash_app.server))
+
 # ==============================
 # 🧭 FastAPI Routes (API)
 # ==============================
+@app.get("/")
+async def root():
+    return {"message": "Predictive Maintenance API. Go to /dashboard/ for the UI", "health": "/health"}
+
 @app.get("/health")
 async def health_check():
     return {
         "status": "online",
         "environment": settings.ENVIRONMENT,
-        "database": "connected" # Podrías añadir lógica de check real aquí
+        "database": "connected"
     }
 
 # ==============================
@@ -76,5 +84,5 @@ async def startup_event():
 
 if __name__ == "__main__":
     import uvicorn
-    # Sin el ".py" en el string
-    uvicorn.run("src.main:app", host="0.0.0.0", port=8000, reload=True)
+    # Ajustado al puerto 8080 para que coincida con tu configuración de Docker habitual
+    uvicorn.run("src.main:app", host="0.0.0.0", port=8080, reload=True)

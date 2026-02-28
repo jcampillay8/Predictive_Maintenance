@@ -4,7 +4,7 @@ import dash_bootstrap_components as dbc
 
 def create_layout():
     return dbc.Container([
-        # 1. Encabezado estilizado (Consistente con tu marca)
+        # 1. Encabezado estilizado
         dbc.Row([
             dbc.Col(
                 html.Div([
@@ -82,9 +82,10 @@ def create_layout():
                 ], className="g-4 mt-2")
             ]),
 
-            # --- PESTAÑA 2: ESTRATEGIA (KPIs) ---
+            # --- PESTAÑA 2: ESTRATEGIA (KPIs + AGENTE IA) ---
             dbc.Tab(label="📈 Estrategia y Mejora de Negocio", tab_id="tab-strategy", children=[
                 dbc.Row([
+                    # Columna de KPIs (Gráfico y Tabla)
                     dbc.Col([
                         dbc.Card([
                             dbc.CardHeader(html.H5("Indicadores de Confiabilidad Regional (MTBF vs MTTR)", className="mb-0")),
@@ -108,12 +109,46 @@ def create_layout():
                                     style_as_list_view=True,
                                 )
                             ])
-                        ], className="shadow-sm")
-                    ], width=12)
-                ], className="mt-2")
+                        ], className="shadow-sm mb-4")
+                    ], lg=8, md=12),
+
+                    # Columna del Agente de IA (Gemini 1.5 Pro)
+                    dbc.Col([
+                        dbc.Card([
+                            dbc.CardHeader(html.H5("🤖 Analista Virtual Komatsu", className="text-white bg-primary mb-0")),
+                            dbc.CardBody([
+                                html.P("Optimización basada en modelos generativos (Gemini 1.5 Pro).", className="small text-muted fw-bold"),
+                                html.Label("Pregunte al analista sobre la flota:", className="small"),
+                                dbc.Textarea(
+                                    id="ai-input",
+                                    placeholder="Ej: ¿Qué máquinas tienen un MTTR crítico y cómo afecta la disponibilidad?",
+                                    style={"height": "120px"},
+                                    className="mb-3"
+                                ),
+                                dbc.Button(
+                                    "Consultar Inteligencia de Activos", 
+                                    id="ask-ai-btn", 
+                                    color="primary", 
+                                    className="w-100 mb-4 shadow-sm"
+                                ),
+                                html.Div([
+                                    html.B("Análisis de Confiabilidad:"),
+                                    dcc.Loading(
+                                        html.Div(
+                                            id="ai-output", 
+                                            className="p-3 border rounded bg-white small shadow-inner", 
+                                            style={"minHeight": "200px", "whiteSpace": "pre-line", "overflowY": "auto"},
+                                            children="El analista está listo. Ingrese una consulta técnica."
+                                        )
+                                    )
+                                ], id="ai-response-container")
+                            ])
+                        ], className="shadow-sm mt-4 sticky-top", style={"top": "20px"})
+                    ], lg=4, md=12)
+                ], className="g-4 mt-2")
             ]),
 
-        ], active_tab="tab-ops") # Empezamos en la vista operacional
+        ], active_tab="tab-ops") 
 
     ], fluid=True, className="p-4 bg-light", style={"minHeight": "100vh"})
 
