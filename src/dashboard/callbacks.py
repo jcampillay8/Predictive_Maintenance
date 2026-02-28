@@ -112,7 +112,8 @@ def register_callbacks(app):
         with SessionLocal() as db:
             # Usamos una conexión directa para Polars
             with engine.connect() as conn:
-                df = pl.read_database("SELECT * FROM reliability_stats", connection=conn)
+                # Busca esta línea (aproximadamente línea 115):
+                df = pl.read_database("SELECT * FROM maintenance.reliability_stats", connection=conn)
             
             fig = go.Figure(data=[
                 go.Bar(name='MTBF (Horas)', x=df['machineID'].to_list(), y=df['MTBF_hours'].to_list()),
