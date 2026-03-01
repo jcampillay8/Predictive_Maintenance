@@ -53,7 +53,7 @@ dash_app = Dash(
 )
 
 # 2. Definir layout y callbacks
-dash_app.title = "Komatsu | Predictive Maintenance"
+dash_app.title = "Dashboard Predictive Maintenance"
 dash_app.layout = layout
 
 # IMPORTANTE: Registrar los callbacks antes de montar la app
